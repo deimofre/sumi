@@ -22,7 +22,7 @@ function main(): void {
 
   // ---- 2. App (WebGL2、入力層、モード)。紙の調整パネルは App より先に作り、前回の値を復元してから紙を作る ----
   let appRef: ReturnType<typeof createApp> = null;
-  const panel = createPanel({ onRebuild: () => appRef?.mode.rebuild?.() });
+  const panel = createPanel({ onRebuild: () => appRef?.mode.rebuild?.(), input: () => appRef?.input.last ?? { pressure: 0, tiltX: 0, tiltY: 0, down: false } });
   const app = createApp(canvas, isModeName(modeParam) ? modeParam : 'fluid');
   if (!app) { fail(); return; }
   appRef = app;

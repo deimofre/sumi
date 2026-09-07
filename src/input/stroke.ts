@@ -40,6 +40,8 @@ export type StrokeSample =
 export interface StrokeInput {
   /** このフレームのサンプルを取り出す (drop → move → tail → hold の順)。aspect は描画バッファの縦横比 W/H */
   collect(dt: number, aspect: number): StrokeSample[];
+  /** 最後に受け取ったポインタの様子 (筆圧・傾きが届いているかの確認用) */
+  readonly last: { pressure: number; tiltX: number; tiltY: number; down: boolean };
   /** 指でも墨を乗せるか (false なら指は ink=false のサンプルになる)。モードごとに切り替える */
   setTouchInks(v: boolean): void;
   /** 溜まっている入力と抜きの尾を捨てる (モード切替時) */
@@ -72,6 +74,7 @@ export function createStrokeInput(canvas: HTMLCanvasElement): StrokeInput {
   const ptr = { x: 0, y: 0, inking: false, inside: false, hold: 0, seed: 0, lastT: 0, dirX: 1, dirY: 0,
                 strokeLen: 0, loadLen: 0, speed: 0, segSpeed: 0, pressure: 0.5, tiltX: 0, tiltY: 0 };
   let touchInks = false;
+  const last = { pressure: 0, tiltX: 0, tiltY: 0, down: false };
   const moves: Move[] = [], drops: Drop[] = [], tails: Tail[] = [];
   const toUv = (e: PointerEvent) => ({ x: e.clientX / canvas.clientWidth, y: 1 - e.clientY / canvas.clientHeight });
   const pressureOf = (e: PointerEvent) => e.pressure > 0 ? e.pressure : 0.5;
@@ -83,6 +86,7 @@ export function createStrokeInput(canvas: HTMLCanvasElement): StrokeInput {
     ptr.seed = Math.random() * 100; ptr.lastT = e.timeStamp;
     ptr.strokeLen = 0; ptr.loadLen = 0; ptr.speed = 0; ptr.segSpeed = 0;
     ptr.pressure = pressureOf(e); ptr.tiltX = e.tiltX; ptr.tiltY = e.tiltY;
+    last.pressure = e.pressure; last.tiltX = e.tiltX; last.tiltY = e.tiltY; last.down = true;
     // 指は既定では墨を乗せない (iPad では Pencil が筆、指が手)
     ptr.inking = e.pointerType !== 'touch' || touchInks;
     if (!ptr.inking) return;
@@ -96,6 +100,7 @@ export function createStrokeInput(canvas: HTMLCanvasElement): StrokeInput {
       if (!ptr.inside) { ptr.inside = true; ptr.x = p.x; ptr.y = p.y; ptr.lastT = ev.timeStamp; continue; }
       const dt = Math.max(2, ev.timeStamp - ptr.lastT) / 1000;
       ptr.lastT = ev.timeStamp;
+      if (last.down) { last.pressure = ev.pressure; last.tiltX = ev.tiltX; last.tiltY = ev.tiltY; }
       if (p.x !== ptr.x || p.y !== ptr.y) {
         // Pencil のホバー (触れていない) や指のなぞりは ink=false のサンプルになる
         moves.push({ x0: ptr.x, y0: ptr.y, x1: p.x, y1: p.y, dt, ink: ptr.inking,
@@ -112,7 +117,7 @@ export function createStrokeInput(canvas: HTMLCanvasElement): StrokeInput {
                    seed: ptr.seed, pressure: ptr.pressure, strokeLen: ptr.strokeLen, loadLen: ptr.loadLen,
                    tiltX: ptr.tiltX, tiltY: ptr.tiltY, p: 0 });
     }
-    ptr.inking = false;
+    ptr.inking = false; last.down = false;
     canvas.classList.remove('is-down');
   }
   canvas.addEventListener('pointerup', release);
@@ -184,7 +189,7 @@ export function createStrokeInput(canvas: HTMLCanvasElement): StrokeInput {
   }
 
   return {
-    collect,
+    collect, last,
     setTouchInks(v) { touchInks = v; },
     reset() { moves.length = 0; drops.length = 0; tails.length = 0; ptr.hold = 0; },
   };
