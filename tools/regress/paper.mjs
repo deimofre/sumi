@@ -31,7 +31,7 @@ try {
     console.log(`${c.t.toFixed(2).padStart(6)} ${String(wetR).padStart(5)} ${String(inkR).padStart(5)}  ${Fc.toFixed(3)}  ${Fpeak.toFixed(3)}  ${String(rPeak).padStart(4)}  ${(Fc > 0 ? Fpeak / Fc : 0).toFixed(2)}  ${total.toFixed(0)}`);
   }
   if (args.includes('--raw')) for (const c of res.checkpoints) {
-    if (![1.5, 2.5, 7.5].includes(Number(c.t.toFixed(2)))) continue;
+    if (![1.5, 2.5, 6.5, 20].includes(Number(c.t.toFixed(1)))) continue;
     const fmt = a => a.slice(0, 20).map(v => v.toFixed(3)).join(' ');
     console.log(`raw t=${c.t.toFixed(1)} (r = 1,3,5,...39px)\n  W: ${fmt(c.water)}\n  P: ${fmt(c.pigment)}\n  F: ${fmt(c.fixed)}`);
   }

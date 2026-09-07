@@ -24,7 +24,7 @@ const pressure = Number(url.searchParams.get('pressure') ?? 0.9);
 const x0 = canvas.clientWidth * 0.08, x1 = canvas.clientWidth * 0.92, y = canvas.clientHeight * 0.5;
 const N = Number(url.searchParams.get('frames') ?? 120);   // ストロークのフレーム数 (少ないほど速い払い)
 let time = 0;
-for (let f = 0; f <= 250; f++) {
+for (let f = 0; f <= 250 + 600; f++) {   // 線を引いた後 10 秒待って乾かす
   const ms = f * 1000 / 60;
   if (f === 5) dispatch(canvas, { type: 'down', x: x0, y, pressure, t: ms });
   else if (f > 5 && f <= 5 + N) dispatch(canvas, { type: 'move', x: x0 + (x1 - x0) * (f - 5) / N, y, pressure, t: ms });

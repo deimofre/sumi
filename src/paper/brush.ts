@@ -2,8 +2,8 @@
 // paper モードの筆: ストロークサンプル → 接地面と、表面の膜に置く水と顔料
 //   接地面: 筆圧で半径。動いているときは進行方向に伸びて後ろへずれる (穂の引きずり)、止まっているときは傾きで楕円
 //   墨残量: ストローク開始時 1。筆圧で重み付けした累積長ととどまった時間で減る。供給量に比例し、掠れのしきい値を上げる
-//   掠れ: 接地判定は紙の高さ (deposit-film.frag)。しきい値は墨残量が少ないほど・筆圧が低いほど・速いほど上がる
-//   毛の割れ: 墨残量が少ない・筆圧が低い・速いとき、接地面が進行方向の細い筋に分かれる (シードはストロークごとに固定)
+//   掠れ: 筆の毛が割れて進行方向に筋が走る (footprint.glsl)。墨残量が少ない・筆圧が低い・速いほど墨を運ぶ毛が減る
+//         (シードはストロークごとに固定)。紙の目は paperGrip の分だけ膜をむらにする
 // ============================================================
 import type { DoubleFBO, FBO } from '../gl/fbo.ts';
 import type { Program } from '../gl/program.ts';
@@ -28,9 +28,7 @@ interface Dab {
   a: number; b: number; cos: number; sin: number;
   dirX: number; dirY: number;
   water: number; pigment: number;
-  /** 接地しきい値 (紙の高さ) */
-  threshold: number;
-  /** 毛の割れ 0..1 */
+  /** 毛の割れ 0..1 (掠れの強さ) */
   split: number;
   seed: number;
 }
@@ -91,14 +89,12 @@ function dabOf(sp: StrokeSample): Dab | null {
   }
   const cos = Math.cos(ang), sin = Math.sin(ang);
 
-  // 掠れのしきい値と毛の割れ
-  const threshold = PAPER.kasureMin + (PAPER.kasureMax - PAPER.kasureMin) * (1 - ink)
-                  + PAPER.kasurePressure * (1 - pressure) + PAPER.kasureSpeed * dry;
-  const splitInk = clamp(1 - ink / PAPER.splitStart, 0, 1);
-  const splitPressure = clamp((0.5 - pressure) / 0.5, 0, 1) * 0.7;
-  const split = Math.min(1, Math.max(splitInk, splitPressure, dry * 0.85));
+  // 毛の割れ (掠れ): 墨切れ・低筆圧・速い払いのうち最も強いもの
+  const splitInk = clamp(1 - ink / Math.max(PAPER.splitStart, 1e-3), 0, 1);
+  const splitPressure = clamp((0.5 - pressure) / 0.5, 0, 1) * PAPER.splitPressure;
+  const split = Math.min(1, Math.max(splitInk, splitPressure, dry * PAPER.splitSpeed));
   return { x: sp.x, y: sp.y, shiftX: cos * shift, shiftY: sin * shift, a, b, cos, sin, dirX: sp.dirX, dirY: sp.dirY,
-           water, pigment, threshold, split, seed: sp.seed };
+           water, pigment, split, seed: sp.seed };
 }
 
 /** このフレームのサンプルを表面の膜に加算する (film.read に直接、ピンポンしない) */
@@ -113,8 +109,9 @@ export function applyInputs(t: DepositTarget, samples: readonly StrokeSample[]):
   const p = t.depositFilm.bind();
   gl.uniform1i(p.u.uPaper, t.paper.attach(0));
   gl.uniform2f(p.u.uAspect, ax, ay);
-  gl.uniform1f(p.u.uSoftness, PAPER.contactSoftness);
+  gl.uniform1f(p.u.uGrip, PAPER.paperGrip);
   gl.uniform1f(p.u.uHairFreq, PAPER.hairFreq);
+  gl.uniform1f(p.u.uHairLength, PAPER.hairLength);
   for (const d of dabs) {
     const r = Math.max(d.a, d.b);
     gl.uniform2f(p.u.uCenter, d.x + d.shiftX / ax, d.y + d.shiftY / ay);
@@ -124,7 +121,6 @@ export function applyInputs(t: DepositTarget, samples: readonly StrokeSample[]):
     gl.uniform2f(p.u.uDir, d.dirX, d.dirY);
     gl.uniform1f(p.u.uSplit, d.split);
     gl.uniform1f(p.u.uSeed, d.seed);
-    gl.uniform1f(p.u.uThreshold, d.threshold);
     gl.uniform1f(p.u.uWater, d.water);
     gl.uniform1f(p.u.uPigment, d.pigment);
     t.blit(t.film.read);

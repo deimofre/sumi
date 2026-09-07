@@ -44,8 +44,8 @@ function profile(view: View): number[] {
   return Array.from(sum, (s, i) => cnt[i] ? s / cnt[i] / PAPER.viewScale : 0);
 }
 
-const HOLD_START = 10, HOLD_END = 100, LAST = 460;
-const CHECKS = [20, 40, 70, 100, 130, 160, 220, 300, 400, 460];
+const HOLD_START = 10, HOLD_END = 100, LAST = 1210;   // 20 秒 (乾くまで見る)
+const CHECKS = [20, 40, 70, 100, 130, 160, 220, 300, 400, 610, 910, 1210];
 const checkpoints: { f: number; t: number; water: number[]; pigment: number[]; fixed: number[] }[] = [];
 const px = { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 };
 let time = 0, pngWet = '';
