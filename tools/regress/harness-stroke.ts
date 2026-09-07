@@ -22,7 +22,7 @@ PAPER.viewScale = 0.25;
 
 const pressure = Number(url.searchParams.get('pressure') ?? 0.9);
 const x0 = canvas.clientWidth * 0.08, x1 = canvas.clientWidth * 0.92, y = canvas.clientHeight * 0.5;
-const N = 120;   // ストロークのフレーム数
+const N = Number(url.searchParams.get('frames') ?? 120);   // ストロークのフレーム数 (少ないほど速い払い)
 let time = 0;
 for (let f = 0; f <= 250; f++) {
   const ms = f * 1000 / 60;
@@ -68,5 +68,5 @@ for (let sIdx = 0; sIdx < SEG; sIdx++) {
   const cov = sfh / n - mf * mh, vf = sff / n - mf * mf, vh = shh / n - mh * mh;
   segments.push({ x: (sIdx + 0.5) / SEG, coverage: covered / n, meanF: mf, corr: vf > 0 && vh > 0 ? cov / Math.sqrt(vf * vh) : 0 });
 }
-const result = { size: [W, H], glError: gl.getError(), pressure, segments, invalid: { F: invalid, P: invalidP, W: invalidW }, bright, maxR, png };
+const result = { size: [W, H], glError: gl.getError(), pressure, frames: N, segments, invalid: { F: invalid, P: invalidP, W: invalidW }, bright, maxR, png };
 document.getElementById('out')!.textContent = '@@RESULT@@' + btoa(unescape(encodeURIComponent(JSON.stringify(result)))) + '@@END@@';

@@ -5,6 +5,9 @@
 // 各テクセルが 8 近傍との水のやり取りを「自分から相手への流出」と「相手から自分への流入」の両方について
 // 同じ式で計算する。相手側でも同じ値が出るので、流束テクスチャ無しで質量が保存される。
 uniform sampler2D uFlow, uProps;
+uniform sampler2D uFilm;          // 細かい格子: B = 染み込んだ顔料、A = 染み込んだ水 (フレーム最初のステップで受け取る)
+uniform vec2 uTexel;              // この格子のテクセル寸法 (uv)
+uniform float uFixFrac;           // 染み込んだ顔料のうちその場で定着する割合 (残りが水に乗る)
 uniform float uK;                 // 拡散係数: 1 ステップで隣へ流れる割合 (0..1 未満で安定)
 uniform float uAniso;             // 繊維方向の効き (0..1)
 uniform float uPorosity;          // 紙の粗密による透過率の差 (0..1)
@@ -45,6 +48,15 @@ void main() {
 
   vec4 props_i = texelFetch(uProps, ij, 0);
   float cap_i = capOf(props_i);
+
+  // --- Absorb: フレーム最初のステップで、膜から染み込んだ分をこのセルに受け取る (細かい格子を 4 点見て平均) ---
+  if (uResetFix > 0.5) {
+    vec2 d = uTexel * 0.25;
+    vec4 a = 0.25 * (texture(uFilm, vUv + d) + texture(uFilm, vUv - d) + texture(uFilm, vUv + vec2(d.x, -d.y)) + texture(uFilm, vUv + vec2(-d.x, d.y)));
+    W += a.a;
+    P += a.b * (1.0 - uFixFrac);
+    if (a.a > 0.0) age = 1.0;
+  }
   float pin_i = pinGate(W);
   float sat_i = clamp(1.0 - W / cap_i, 0.0, 1.0);
   float c_i = P / max(W, 1e-4);   // 顔料の濃度
@@ -72,9 +84,8 @@ void main() {
   }
   W += dW;
   P += dP + uPigDiff * lapP;
-  // 容量を超えた水は捨てない: 筆が置いた余分な水は表面の溜まりとして残り、数秒かけて周りへ供給される
-  // (隣は容量までしか受け取らないので、溜まりの外には広がらない)。負は丸め誤差の保険
-  W = max(W, 0.0);
+  // 容量を超えた分は入らない (余分な水は表面の膜に残っていて、空きができたら染み込む)。負は丸め誤差の保険
+  W = clamp(W, 0.0, cap_i);
   P = max(P, 0.0);
 
   // --- Evaporate: 薄い水ほど速く乾く (縁から乾く) ---
