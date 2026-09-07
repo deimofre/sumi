@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "fonts": "node tools/subset-font.mjs",
     "regress": "node tools/regress/run.mjs",
-    "regress:paper": "node tools/regress/paper.mjs"
+    "regress:paper": "node tools/regress/paper.mjs",
+    "regress:stroke": "node tools/regress/stroke.mjs"
   },
   "devDependencies": {
     "subset-font": "^2.7.0",

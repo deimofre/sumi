@@ -22,5 +22,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src", "tools/regress/shared.ts", "tools/regress/harness-new.ts", "tools/regress/harness-switch.ts", "tools/regress/harness-paper.ts"]
+  "include": ["src", "tools/regress/shared.ts", "tools/regress/harness-new.ts", "tools/regress/harness-switch.ts", "tools/regress/harness-paper.ts", "tools/regress/harness-stroke.ts"]
 }

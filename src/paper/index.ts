@@ -16,7 +16,7 @@ import { createPaperPrograms, type PaperPrograms } from './shaders/index.ts';
 // プログラムはコンテキストごとに 1 度だけコンパイルし、モードを行き来しても使い回す
 const programs = new WeakMap<WebGL2RenderingContext, PaperPrograms>();
 
-const VIEW_INDEX = { paper: 0, height: 1, water: 2, pigment: 3, fixed: 4 } as const;
+const VIEW_INDEX = { paper: 0, height: 1, water: 2, pigment: 3, fixed: 4, invalid: 5 } as const;
 
 /** 細かい格子の解像度。短辺を params の値 (0 なら端末に応じて 1024 / 2048) に合わせる */
 function fineResolution(ctx: AppContext): Size {
@@ -62,6 +62,8 @@ export function createPaperMode(ctx: AppContext): Mode {
     gl.uniform1i(p.u.uProps, paper.attachProps(1));
     gl.uniform1f(p.u.uK, PAPER.diffusion);
     gl.uniform1f(p.u.uAniso, PAPER.anisotropy);
+    gl.uniform1f(p.u.uPorosity, PAPER.porosityContrast);
+    gl.uniform1f(p.u.uFilter, PAPER.filterRate);
     gl.uniform1f(p.u.uPin, PAPER.pinThreshold);
     gl.uniform1f(p.u.uCapacity, PAPER.capacity);
     gl.uniform1f(p.u.uPigDiff, PAPER.pigmentDiffusion);
@@ -79,6 +81,7 @@ export function createPaperMode(ctx: AppContext): Mode {
     gl.uniform1i(p.u.uFixed, fixed.read.attach(0));
     gl.uniform1i(p.u.uFlow, flow.read.attach(1));
     gl.uniform1i(p.u.uPaper, paper.attach(2));
+    gl.uniform1i(p.u.uProps, paper.attachProps(3));
     gl.uniform1f(p.u.uSettle, PAPER.settleStrength);
     blit(fixed.write); fixed.swap();
   }
@@ -87,6 +90,7 @@ export function createPaperMode(ctx: AppContext): Mode {
     gl.uniform1i(p.u.uPaper, paper.attach(0));
     gl.uniform1i(p.u.uFixed, fixed.read.attach(1));
     gl.uniform1i(p.u.uFlow, flow.read.attach(2));
+    gl.uniform1i(p.u.uProps, paper.attachProps(3));
     gl.uniform2f(p.u.uPaperPx, ctx.W / ctx.dpr, ctx.H / ctx.dpr);
     gl.uniform1f(p.u.uAspect, ctx.aspect);
     gl.uniform1f(p.u.uInkOpacity, PAPER.inkOpacity);

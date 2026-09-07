@@ -7,6 +7,8 @@
 uniform sampler2D uFlow, uProps;
 uniform float uK;                 // 拡散係数: 1 ステップで隣へ流れる割合 (0..1 未満で安定)
 uniform float uAniso;             // 繊維方向の効き (0..1)
+uniform float uPorosity;          // 紙の粗密による透過率の差 (0..1)
+uniform float uFilter;            // 濾過: 流入する顔料のうちその場で定着する割合
 uniform float uPin;               // ピン止め: W がこれ以下の点からは流出しない
 uniform float uCapacity;          // 保水容量の基準
 uniform float uPigDiff;           // 顔料の微小な等方拡散
@@ -24,11 +26,14 @@ const float W_AXIS = 1.0 / 6.0, W_DIAG = 1.0 / 12.0;
 
 float capOf(vec4 props) { return uCapacity * (0.6 + 0.8 * props.a); }   // 高い所 (繊維) ほど水を持てる
 float pinGate(float w) { return smoothstep(uPin, uPin * 2.0, w); }
-// 相手 j の透過率。繊維に沿う向きは通りやすく、直交する向きは (揃い具合 × uAniso) だけ通りにくい
+// 相手 j の透過率。繊維に沿う向きは通りやすく、直交する向きは (揃い具合 × uAniso) だけ通りにくい。
+// 紙の粗密 (高さの平均) でも変わり、繊維が密な所は通りにくい → 前線が不揃いになる。
+// 透過率は必ず 1 以下にする (超えると流出の合計が W を超えて負になる)
 float permOf(vec4 props, vec2 dir) {
   vec2 f = props.rg * 2.0 - 1.0;
   float along = abs(dot(dir, f));
-  return 1.0 - uAniso * props.b * (1.0 - along);
+  float porosity = clamp(1.0 - uPorosity * (props.a - 0.5) * 2.0, 0.1, 1.0);
+  return porosity * (1.0 - uAniso * props.b * (1.0 - along));
 }
 
 void main() {
@@ -45,7 +50,7 @@ void main() {
   float c_i = P / max(W, 1e-4);   // 顔料の濃度
 
   // --- Diffuse (水) + Transport (顔料は水の流れに乗る) ---
-  float dW = 0.0, dP = 0.0, lapP = 0.0;
+  float dW = 0.0, dP = 0.0, lapP = 0.0, filtered = 0.0;
   for (int n = 0; n < 8; n++) {
     ivec2 jj = ij + DIRS[n];
     if (jj.x < 0 || jj.y < 0 || jj.x >= size.x || jj.y >= size.y) continue;   // 紙の端は流れない
@@ -59,12 +64,18 @@ void main() {
     // 相手 → 自分: 相手の側で計算した流出と同じ式・同じ順序 (bit 単位で一致する)
     float inF  = uK * wgt * max(Wj - W, 0.0) * permOf(props_i, dir) * sat_i * pinGate(Wj);
     dW += inF - outF;
-    dP += inF * (Pj / max(Wj, 1e-4)) - outF * c_i;
+    // 流入する顔料の一部はその場の繊維に濾し取られて定着する (暈が外へ向かって薄れる)
+    float pIn = inF * (Pj / max(Wj, 1e-4));
+    dP += pIn * (1.0 - uFilter) - outF * c_i;
+    filtered += pIn * uFilter;
     lapP += wgt * (Pj - P);
   }
   W += dW;
   P += dP + uPigDiff * lapP;
-  W = min(W, cap_i);   // 筆から容量以上に載った水は紙に入らない
+  // 容量を超えた水は捨てない: 筆が置いた余分な水は表面の溜まりとして残り、数秒かけて周りへ供給される
+  // (隣は容量までしか受け取らないので、溜まりの外には広がらない)。負は丸め誤差の保険
+  W = max(W, 0.0);
+  P = max(P, 0.0);
 
   // --- Evaporate: 薄い水ほど速く乾く (縁から乾く) ---
   float thin = 1.0 - clamp(W / cap_i, 0.0, 1.0);
@@ -74,7 +85,7 @@ void main() {
   float dry = 1.0 - clamp(W / cap_i, 0.0, 1.0);
   float fix = P * min(1.0, uFix * uDt * dry);
   if (P - fix < 0.002 && dry > 0.5) fix = P;   // 残りわずかは全部定着させる (fp16 の丸めで永遠に残らないように)
-  Fx += fix; P -= fix;
+  Fx += fix + filtered; P -= fix;
 
   age *= uAgeDecay;
   o = vec4(W, P, Fx, age);

@@ -6,6 +6,7 @@
 uniform sampler2D uPaper;     // 細かい格子: RGB = 和紙の色、A = 高さ
 uniform sampler2D uFixed;     // 細かい格子: R = 固定顔料 F
 uniform sampler2D uFlow;      // 粗い格子: R = 水 W、G = 移動顔料 P、A = 湿り年齢
+uniform sampler2D uProps;     // 粗い格子: A = 高さの平均
 uniform vec2 uPaperPx;        // CSS ピクセル寸法 (ディザ用)
 uniform float uAspect, uInkOpacity, uCapacity, uSettle, uViewScale;
 uniform int uView;            // 0 通常 / 1 高さ / 2 水 / 3 移動顔料 / 4 固定顔料
@@ -22,8 +23,11 @@ void main() {
   if (uView == 2) { o = vec4(vec3(sqrt(clamp(W * uViewScale, 0.0, 1.0))), 1.0); return; }
   if (uView == 3) { o = vec4(vec3(sqrt(clamp(P * uViewScale, 0.0, 1.0))), 1.0); return; }
   if (uView == 4) { o = vec4(vec3(sqrt(clamp(F * uViewScale, 0.0, 1.0))), 1.0); return; }
+  // 診断: 負や NaN を赤 (F)、緑 (P)、青 (W) で示す (>= の比較は NaN で偽になる)
+  if (uView == 5) { o = vec4(F >= 0.0 ? 0.0 : 1.0, P >= 0.0 ? 0.0 : 1.0, W >= 0.0 ? 0.0 : 1.0, 1.0); return; }
 
-  float Pd = P * (1.0 + uSettle * (h - 0.5) * 2.0);                // 水に乗った顔料も紙の目で見える
+  float hAvg = texture(uProps, vUv).a;
+  float Pd = P * clamp(1.0 + uSettle * (h - hAvg) * 2.5, 0.0, 2.0);   // 水に乗った顔料も紙の目で見える (settle.frag と同じ重み)
   float a = 1.0 - exp(-(F + Pd) * uInkOpacity);                     // 濃度 → 不透明度 (重ねるほど飽和)
   vec3 inkCol = mix(INK_THIN, INK_DENSE, smoothstep(0.0, 0.9, a));  // 薄い所は青みが出る
   vec3 col = paper.rgb * (1.0 - 0.07 * clamp(W / uCapacity, 0.0, 1.0));   // 濡れた紙は少し暗い
