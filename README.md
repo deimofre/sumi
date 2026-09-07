@@ -12,7 +12,7 @@ npm run regress   # fluid モードの回帰確認 (macOS の Chrome が要る�
 
 - **水面 (fluid)**: 水面に墨を流す。分割前からの実装で、見た目と挙動は変えていない。
 - **紙 (paper)**: 紙に筆で書く (毛細管にじみモデル)。`paper-ink-mode-spec.md` の指示書に沿って段階的に作っている。
-  Phase 4 (表示の統合: 共通の色ルール、湿り艶、文字と落款) まで済み。残りはデバッグパネルとプリセット (Phase 5)。
+  Phase 5 (調整パネル・プリセット) まで済み。以後はパラメータの調整と、実機での見た目・性能の詰め。
 
 切替は画面右下の「水面 / 紙」、キーボードの `m`、または URL の `?mode=paper`。切替時にシミュレーションの状態は捨て、バッファは解放する。
 
@@ -23,6 +23,7 @@ npm run regress   # fluid モードの回帰確認 (macOS の Chrome が要る�
 | `h` / `?view=height` | 紙モードで、紙の高さ (掠れ判定に使う凹凸) を白黒で見る |
 | `v` / `?view=water` など | 紙モードで表示を切り替える: paper → height → water → pigment → fixed |
 | `?mode=paper` | 紙モードで開く |
+| `p` / 「調整」 / `?panel=1` | 紙モードの調整パネルを開閉。値は自動で保存され、次回も復元される。JSON の書き出し / 読み込みと既定値への復帰もここ |
 
 ## 構成
 
@@ -32,8 +33,9 @@ src/
   app/               App (GL 環境 + 入力層 + 現在のモード) と Mode インターフェース
   input/stroke.ts    入力層 (両モード共通): ポインタ → ストロークサンプル列。入り・抜き・とどまりの判定
   sim/               fluid モード。brush.ts がサンプルを水面への注入に変換し、fluid.ts が 1 ステップ進める
-  paper/             paper モード。params.ts にパラメータ、paperTexture.ts が紙 (画像 or プロシージャル)、
+  paper/             paper モード。params.ts にパラメータの定義 (既定値・範囲・説明)、paperTexture.ts が紙 (画像 or プロシージャル)、
                      brush.ts が筆、index.ts が毎フレームのパス
+  ui/panel.ts        調整パネル (params.ts の定義から自動生成。プリセットの書き出し / 読み込み、fps)
   text/textLayer.ts  文字と落款 (両モード共通、2D canvas → テクスチャ)。縦組みの文はモードごと
   shaders/           fluid のシェーダー。common/ は両モード共有 (#include で読む)
   paper/shaders/     paper のシェーダー
@@ -42,6 +44,8 @@ legacy/              分割前の単一ファイル版。挙動の比較用
 tools/regress/       fluid の回帰確認ハーネス
 ```
 
+- パラメータは `src/paper/params.ts` の `PAPER_SCHEMA` に集約している。既定値を変えるならここ。調整パネルの値は `localStorage` に
+  保存されるので、既定値を変えた後は「既定に戻す」を押すか保存を消す。
 - 紙画像を使うときは `src/paper/params.ts` の `paperImage` に URL を入れる。RGB が和紙の色、A が高さ (0..1)。
   無ければプロシージャル生成に落ちる。
 - 文言を変えたら `npm run fonts` でサブセットフォントを作り直す (無い字はしっぽり明朝で出る)。

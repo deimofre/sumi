@@ -132,6 +132,7 @@ export function createPaperMode(ctx: AppContext): Mode {
       render(time);
     },
     resize() { disposeAll(); ({ paper, flow, fixed } = build()); redrawText(); },
+    rebuild() { disposeAll(); ({ paper, flow, fixed } = build()); },
     clear() {
       // 新しい紙にする: 墨を消し、目の違う紙を生成し直す (画像の紙ではそのまま)
       seed = Math.floor(Math.random() * 1000);

@@ -28,6 +28,8 @@ export interface Mode {
   resize(): void;
   /** 「紙を替える」 */
   clear(): void;
+  /** 格子や紙の設定が変わった。バッファを作り直す (墨は消える) */
+  rebuild?(): void;
   /** GPU リソースを解放する。以後このモードは使われない */
   dispose(): void;
 }
