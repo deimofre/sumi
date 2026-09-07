@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>墨 — WebGL2 流体サンプル v3 (入りと抜き)</title>
+</head>
+<body>
+<canvas id="gl" aria-label="墨の流体キャンバス。なぞると墨が流れます"></canvas>
+<div class="ui">
+  <p>筆(ペン)で墨が乗る。指は水面を揺らす。マウスは押しながら。<br>ひと呼吸とどまると、墨が溜まる。</p>
+  <button id="clear" type="button">紙を替える</button>
+</div>
+<div id="fallback">この端末のブラウザは WebGL2 の浮動小数テクスチャに対応していないため、<br>流体を表示できません。</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

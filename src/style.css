@@ -1,0 +1,31 @@
+html, body { margin: 0; height: 100%; background: #e6e0d1; overflow: hidden; }
+#gl {
+  position: fixed; inset: 0; width: 100%; height: 100%; display: block;
+  touch-action: none; -webkit-user-select: none; user-select: none;
+  /* 触れる前: 穂先の輪。中心が当たり判定 (hotspot 12 12) */
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='8' fill='none' stroke='%233d3934' stroke-width='1.5' opacity='.85'/%3E%3Ccircle cx='12' cy='12' r='1.5' fill='%233d3934'/%3E%3C/svg%3E") 12 12, crosshair;
+}
+#gl.is-down {
+  /* 押している間: 墨を含んだ筆。にじみを足して「乗っている」感じに */
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='%233d3934' opacity='.18'/%3E%3Ccircle cx='12' cy='12' r='5.5' fill='%231a1816' opacity='.95'/%3E%3C/svg%3E") 12 12, crosshair;
+}
+.ui {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  padding: 18px 22px calc(18px + env(safe-area-inset-bottom));
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;
+  pointer-events: none;
+  font-family: "Sumi", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+  color: #3d3934; font-size: 13px; letter-spacing: .08em; line-height: 1.7;
+}
+.ui p { margin: 0; opacity: .72; }
+.ui button {
+  pointer-events: auto; font: inherit; letter-spacing: inherit;
+  background: none; border: 0; border-bottom: 1px solid currentColor;
+  padding: 2px 0; color: inherit; cursor: pointer; opacity: .72; white-space: nowrap;
+}
+.ui button:hover, .ui button:focus-visible { opacity: 1; outline: none; }
+.ui button:focus-visible { box-shadow: 0 2px 0 0 currentColor; }
+#fallback {
+  position: fixed; inset: 0; display: none; place-items: center; padding: 32px;
+  font: 15px/1.8 "Sumi", "Shippori Mincho", serif; color: #3d3934; text-align: center;
+}

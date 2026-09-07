@@ -1,0 +1,8 @@
+/* tools/subset-font.mjs が生成する。手で編集しない */
+@font-face {
+  font-family: "Sumi";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(/fonts/KswSeiryuN.woff2) format("woff2");
+}

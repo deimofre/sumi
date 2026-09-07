@@ -1,0 +1,8 @@
+node_modules
+dist
+.DS_Store
+# 商用フォント (昭和書体 KSW清龍N) の元ファイルは配布しない。README だけ残す
+fonts-src/*
+!fonts-src/README.md
+# サブセット済み woff2 も商用フォント由来なので配布しない。無ければしっぽり明朝で表示される
+public/fonts/*.woff2
