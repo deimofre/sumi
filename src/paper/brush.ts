@@ -7,7 +7,7 @@
 // ============================================================
 import type { DoubleFBO, FBO } from '../gl/fbo.ts';
 import type { Program } from '../gl/program.ts';
-import { MOVE_SPACING, type StrokeSample } from '../input/stroke.ts';
+import { TAIL_SPACING, type StrokeSample } from '../input/stroke.ts';
 import { clamp, smooth } from '../util/math.ts';
 import { PAPER } from './params.ts';
 import type { PaperTexture } from './paperTexture.ts';
@@ -50,32 +50,15 @@ function dabOf(sp: StrokeSample): Dab | null {
   if (!sp.ink) return null;
   const ink = inkRemaining(sp);
   const pressure = sp.kind === 'tail' ? sp.pressure * (1 - sp.t) : sp.pressure;   // 抜きでは筆圧が抜けていく
-  let radius = PAPER.brushRadius * (PAPER.pressureMin + (1 - PAPER.pressureMin) * pressure);
-  let water: number, pigment: number;
-  switch (sp.kind) {
-    case 'drop':   // 穂先が触れた点。まだ小さい
-      radius *= 0.5; water = PAPER.brushWater * 0.5; pigment = PAPER.brushPigment * 0.5;
-      break;
-    case 'move': { // 入りで太くなる。補間点の間隔が広いときは供給量で補う
-      const len = sp.spacing / MOVE_SPACING;
-      radius *= 0.45 + 0.55 * sp.entry; water = PAPER.brushWater * len; pigment = PAPER.brushPigment * len;
-      break;
-    }
-    case 'tail': { // 抜き: 尾の先ほど細く薄い
-      const f = 1 - sp.t;
-      radius *= 0.15 + 0.85 * f; water = PAPER.brushWater * 0.8 * f * f; pigment = PAPER.brushPigment * 0.8 * f * f;
-      break;
-    }
-    case 'hold':   // とどまり: 供給が続く。染み込みきらない分が液だまりになる
-      water = PAPER.holdWater * sp.dt; pigment = PAPER.holdPigment * sp.dt;
-      break;
-  }
-  water *= ink; pigment *= ink;   // 供給量は墨残量に比例
+  // 筆圧 → 半径 (穂先だけ → 腹まで)。カーブの指数で軽い筆圧の太さを調整する
+  let radius = PAPER.brushRadius * (PAPER.pressureMin + (1 - PAPER.pressureMin) * Math.pow(pressure, PAPER.pressureCurve));
+  const supply = Math.pow(ink, PAPER.inkFalloff);   // 書き出しは濃く滲み、終わりへ向けて薄く乾く
 
   // 接地面の形。動いていれば進行方向に伸びて後ろへずれる (穂の引きずり)。止まっていれば傾きで楕円 (穂先が端)
   const dry = dryness(sp.speed);
   let a = radius, b = radius, ang = 0, shift = 0;
-  if (sp.kind === 'move' || sp.kind === 'tail') {
+  const moving = sp.kind === 'move' || sp.kind === 'tail';
+  if (moving) {
     a = radius * (1 + PAPER.dragElongation * Math.min(sp.speed / 1.5, 1));
     ang = Math.atan2(sp.dirY, sp.dirX);
     shift = -(a - b) * 0.5;
@@ -87,6 +70,35 @@ function dabOf(sp: StrokeSample): Dab | null {
       shift = (a - b) * 0.5;
     }
   }
+
+  // 供給量。なぞりは「筆が通った所の膜の厚さ」が太さによらず同じになるよう、進行方向の半径で割る
+  // (1 点は 2a / spacing 個のサンプルに覆われる)
+  let water: number, pigment: number;
+  switch (sp.kind) {
+    case 'drop':   // 穂先が触れた点。まだ小さい
+      radius *= 0.5; a *= 0.5; b *= 0.5;
+      water = PAPER.brushWater * 0.3; pigment = PAPER.brushPigment * 0.3;
+      break;
+    case 'move': { // 入りで太くなる
+      const e = 0.45 + 0.55 * sp.entry;
+      radius *= e; a *= e; b *= e;
+      const perSample = sp.spacing / (2 * a);
+      water = PAPER.brushWater * perSample; pigment = PAPER.brushPigment * perSample;
+      break;
+    }
+    case 'tail': { // 抜き: 尾の先ほど細く薄い
+      const f = 1 - sp.t;
+      const e = 0.15 + 0.85 * f;
+      radius *= e; a *= e; b *= e;
+      const perSample = TAIL_SPACING / (2 * a);
+      water = PAPER.brushWater * perSample * f; pigment = PAPER.brushPigment * perSample * f;
+      break;
+    }
+    case 'hold':   // とどまり: 供給が続く。染み込みきらない分が液だまりになる
+      water = PAPER.holdWater * sp.dt; pigment = PAPER.holdPigment * sp.dt;
+      break;
+  }
+  water *= supply; pigment *= supply;
   const cos = Math.cos(ang), sin = Math.sin(ang);
 
   // 毛の割れ (掠れ): 墨切れ・低筆圧・速い払いのうち最も強いもの
