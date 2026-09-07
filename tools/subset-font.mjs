@@ -1,7 +1,7 @@
 // fonts-src/*.{otf,ttf,woff,woff2} を「使う文字 + かな + 英数」だけに絞り、
 // public/fonts/*.woff2 と src/fonts.css を生成する。
 //   npm run fonts
-// 文言を変えて新しい漢字が増えたら再実行する (index.html と src/sim/textLayer.ts から自動で拾う)。
+// 文言を変えて新しい漢字が増えたら再実行する (index.html と文字レイヤー・各モードの文から自動で拾う)。
 // 自動で拾えない文字は tools/extra-glyphs.txt に書いておくと追加される。
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
@@ -23,7 +23,7 @@ let chars = range(0x20, 0x7e)      // ASCII
   + range(0x30a0, 0x30ff)          // カタカナ・ー
   + range(0xff01, 0xff5e)          // 全角英数
   + '—…〜・';
-for (const f of ['index.html', 'src/sim/textLayer.ts', 'tools/extra-glyphs.txt']) {
+for (const f of ['index.html', 'src/text/textLayer.ts', 'src/sim/index.ts', 'src/paper/index.ts', 'tools/extra-glyphs.txt']) {
   const p = join(root, f);
   if (existsSync(p)) chars += readFileSync(p, 'utf8');
 }

@@ -48,7 +48,7 @@ const HOLD_START = 10, HOLD_END = 100, LAST = 460;
 const CHECKS = [20, 40, 70, 100, 130, 160, 220, 300, 400, 460];
 const checkpoints: { f: number; t: number; water: number[]; pigment: number[]; fixed: number[] }[] = [];
 const px = { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 };
-let time = 0;
+let time = 0, pngWet = '';
 // 見た目の確認用に、計測点から離れた下の方に 1 本ストロークも引く (200〜260 フレーム、筆圧を変えながら)
 const STROKE = { start: 200, end: 260, x0: canvas.clientWidth * 0.15, x1: canvas.clientWidth * 0.85, y0: canvas.clientHeight * 0.88, y1: canvas.clientHeight * 0.84 };
 for (let f = 0; f <= LAST; f++) {
@@ -64,11 +64,12 @@ for (let f = 0; f <= LAST; f++) {
     else dispatch(canvas, { type: 'move', x, y, pressure, t: ms });
   }
   time += DT; app.frame(DT, time);
+  if (f === 70) { app.mode.frame([], 0, time); pngWet = canvas.toDataURL('image/png'); }   // とどまっている最中 (濡れて艶がある)
   if (CHECKS.includes(f)) checkpoints.push({ f, t: (f - HOLD_START) / 60, water: profile('water'), pigment: profile('pigment'), fixed: profile('fixed') });
 }
 app.mode.frame([], 0, time);
 const pngNormal = canvas.toDataURL('image/png');
 PAPER.view = 'fixed'; app.mode.frame([], 0, time);
 const pngFixed = canvas.toDataURL('image/png');
-const result = { size: [W, H], bin: BIN, glError: gl.getError(), overrides, checkpoints, pngNormal, pngFixed };
+const result = { size: [W, H], bin: BIN, glError: gl.getError(), overrides, checkpoints, pngNormal, pngFixed, pngWet };
 document.getElementById('out')!.textContent = '@@RESULT@@' + btoa(unescape(encodeURIComponent(JSON.stringify(result)))) + '@@END@@';

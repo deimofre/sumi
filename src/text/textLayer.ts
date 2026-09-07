@@ -1,12 +1,14 @@
 // ============================================================
-// 文字レイヤー (2D canvas → テクスチャ)。r=文字 g=落款
+// 文字レイヤー (共通層、2D canvas → テクスチャ)。r=文字 g=落款
+// 大きな「墨」の字と落款は両モード共通。縦組みの短い文はモードごとに渡す
 // ============================================================
 import { must } from '../gl/context.ts';
-import type { SimState } from './state.ts';
+
+/** 描き先: GL コンテキスト、描画バッファの寸法、書き込むテクスチャ */
+export interface TextTarget { gl: WebGL2RenderingContext; W: number; H: number; dpr: number; textTex: WebGLTexture }
 
 // "Sumi" は fonts-src/ から生成した自前フォント (src/fonts.css)。無ければしっぽり明朝に落ちる
 const FAM = '"Sumi", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif';
-const LINES = ['触れれば揺れる。', '押せば墨が乗り、とどまれば溜まる。', '乾けば、青みを帯びる。'];
 const tcv = document.createElement('canvas');
 const tc = must(tcv.getContext('2d'), 'getContext(2d)');
 
@@ -40,7 +42,7 @@ function drawSeal(x: number, y: number, s: number): void {
   tc.fillText('墨', x, y + s * 0.24);
   tc.restore();
 }
-export function drawText(s: SimState): void {
+export function drawText(s: TextTarget, lines: readonly string[]): void {
   const { gl, W, H, dpr } = s;
   tcv.width = W; tcv.height = H;
   tc.fillStyle = '#000'; tc.fillRect(0, 0, W, H);
@@ -54,11 +56,11 @@ export function drawText(s: SimState): void {
 
   const fs = Math.max(13 * dpr, Math.min(22 * dpr, m * 0.032));
   const lh = fs * 1.12;
-  const longest = Math.max(...LINES.map(l => [...l].length));
+  const longest = Math.max(...lines.map(l => [...l].length));
   const colX = portrait ? W * 0.86 : W * 0.80;
   const top = portrait ? gy + big * 0.55 + fs : H * 0.5 - longest * lh * 0.5;
   tc.font = `400 ${fs}px ${FAM}`;
-  LINES.forEach((line, i) => drawVertical(line, colX - i * fs * 2.1, top, fs, lh));
+  lines.forEach((line, i) => drawVertical(line, colX - i * fs * 2.1, top, fs, lh));
 
   drawSeal(gx + big * 0.46, gy + big * 0.40, fs * 1.75);
 
@@ -67,12 +69,12 @@ export function drawText(s: SimState): void {
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tcv);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 }
-/** Webフォントが届いたら描き直す (来なければシステム明朝のまま) */
-export function watchFonts(s: SimState): void {
+/** Webフォントが届いたら redraw を呼ぶ (来なければシステム明朝のまま) */
+export function watchFonts(redraw: () => void): void {
   if (document.fonts && document.fonts.load) {
     Promise.race([
       document.fonts.load('600 100px "Sumi", "Shippori Mincho"').then(() => document.fonts.load('400 20px "Sumi", "Shippori Mincho"')),
       new Promise(r => setTimeout(r, 2500)),
-    ]).then(() => { if (s.W) drawText(s); });
+    ]).then(redraw);
   }
 }

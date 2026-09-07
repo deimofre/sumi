@@ -12,6 +12,11 @@ import { applyInputs } from './brush.ts';
 import { PAPER } from './params.ts';
 import { createPaperTexture, loadPaperImage, type PaperTexture, type Size } from './paperTexture.ts';
 import { createPaperPrograms, type PaperPrograms } from './shaders/index.ts';
+import { createTextTexture, drawText, watchFonts } from '../text/textLayer.ts';
+
+// 縦組みの短い文 (紙モードの説明)
+const LINES = ['とどまれば、にじむ。', '走らせれば、掠れる。', '乾けば、縁が残る。'];
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // プログラムはコンテキストごとに 1 度だけコンパイルし、モードを行き来しても使い回す
 const programs = new WeakMap<WebGL2RenderingContext, PaperPrograms>();
@@ -33,6 +38,11 @@ export function createPaperMode(ctx: AppContext): Mode {
   let seed = 0;                             // 0 は fluid モードと同じ目の紙。「紙を替える」で変わる
   let image: ImageBitmap | null = null;     // 紙画像が読めたらプロシージャルの代わりに使う
   let disposed = false;
+
+  // 文字と落款 (共通層)。Web フォントが後から届いたら描き直す
+  const textTex = createTextTexture(gl);
+  const redrawText = () => { if (!disposed) drawText({ gl, W: ctx.W, H: ctx.H, dpr: ctx.dpr, textTex }, LINES); };
+  redrawText(); watchFonts(redrawText);
 
   function clearState(...targets: DoubleFBO[]): void {
     gl.clearColor(0, 0, 0, 0);
@@ -85,18 +95,26 @@ export function createPaperMode(ctx: AppContext): Mode {
     gl.uniform1f(p.u.uSettle, PAPER.settleStrength);
     blit(fixed.write); fixed.swap();
   }
-  function render(): void {
+  function render(time: number): void {
     const p = display.bind();
     gl.uniform1i(p.u.uPaper, paper.attach(0));
     gl.uniform1i(p.u.uFixed, fixed.read.attach(1));
     gl.uniform1i(p.u.uFlow, flow.read.attach(2));
     gl.uniform1i(p.u.uProps, paper.attachProps(3));
+    gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, textTex);
+    gl.uniform1i(p.u.uText, 4);
     gl.uniform2f(p.u.uPaperPx, ctx.W / ctx.dpr, ctx.H / ctx.dpr);
+    gl.uniform2f(p.u.uFineTexel, 1 / paper.width, 1 / paper.height);
+    gl.uniform2f(p.u.uCoarseTexel, flow.texelX, flow.texelY);
     gl.uniform1f(p.u.uAspect, ctx.aspect);
     gl.uniform1f(p.u.uInkOpacity, PAPER.inkOpacity);
     gl.uniform1f(p.u.uCapacity, PAPER.capacity);
     gl.uniform1f(p.u.uSettle, PAPER.settleStrength);
     gl.uniform1f(p.u.uViewScale, PAPER.viewScale);
+    gl.uniform1f(p.u.uTime, reduceMotion ? 0 : time);
+    gl.uniform1f(p.u.uGloss, PAPER.gloss);
+    gl.uniform1f(p.u.uBump, PAPER.bump);
+    gl.uniform1f(p.u.uWetDarken, PAPER.wetDarken);
     gl.uniform1i(p.u.uView, VIEW_INDEX[PAPER.view]);
     blit(null);
   }
@@ -104,22 +122,22 @@ export function createPaperMode(ctx: AppContext): Mode {
   return {
     name: 'paper',
     touchInks: true,   // 紙では指でも書ける (iPhone には Pencil が無い)
-    frame(samples, dt, _time) {
+    frame(samples, dt, time) {
       applyInputs({ gl, blit, depositFlow, depositFixed, flow, fixed, paper, aspect: ctx.aspect }, samples);
       if (dt > 0) {
         const steps = Math.max(1, Math.round(PAPER.flowSteps));
         for (let i = 0; i < steps; i++) step(dt / steps, i === 0);
         settleFixed();
       }
-      render();
+      render(time);
     },
-    resize() { disposeAll(); ({ paper, flow, fixed } = build()); },
+    resize() { disposeAll(); ({ paper, flow, fixed } = build()); redrawText(); },
     clear() {
       // 新しい紙にする: 墨を消し、目の違う紙を生成し直す (画像の紙ではそのまま)
       seed = Math.floor(Math.random() * 1000);
       paper.regenerate(seed);
       clearState(flow, fixed);
     },
-    dispose() { disposed = true; disposeAll(); },
+    dispose() { disposed = true; disposeAll(); gl.deleteTexture(textTex); },
   };
 }

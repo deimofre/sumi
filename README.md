@@ -12,7 +12,7 @@ npm run regress   # fluid モードの回帰確認 (macOS の Chrome が要る�
 
 - **水面 (fluid)**: 水面に墨を流す。分割前からの実装で、見た目と挙動は変えていない。
 - **紙 (paper)**: 紙に筆で書く (毛細管にじみモデル)。`paper-ink-mode-spec.md` の指示書に沿って段階的に作っている。
-  いまは Phase 3 (筆モデル: 筆圧と傾きの接地面、墨残量、紙の高さによる掠れ、毛の割れ) まで。表示の統合 (艶・文字・落款) は Phase 4。
+  Phase 4 (表示の統合: 共通の色ルール、湿り艶、文字と落款) まで済み。残りはデバッグパネルとプリセット (Phase 5)。
 
 切替は画面右下の「水面 / 紙」、キーボードの `m`、または URL の `?mode=paper`。切替時にシミュレーションの状態は捨て、バッファは解放する。
 
@@ -34,6 +34,7 @@ src/
   sim/               fluid モード。brush.ts がサンプルを水面への注入に変換し、fluid.ts が 1 ステップ進める
   paper/             paper モード。params.ts にパラメータ、paperTexture.ts が紙 (画像 or プロシージャル)、
                      brush.ts が筆、index.ts が毎フレームのパス
+  text/textLayer.ts  文字と落款 (両モード共通、2D canvas → テクスチャ)。縦組みの文はモードごと
   shaders/           fluid のシェーダー。common/ は両モード共有 (#include で読む)
   paper/shaders/     paper のシェーダー
   config.ts          fluid の数値 (解像度、半減期など)
@@ -43,10 +44,11 @@ tools/regress/       fluid の回帰確認ハーネス
 
 - 紙画像を使うときは `src/paper/params.ts` の `paperImage` に URL を入れる。RGB が和紙の色、A が高さ (0..1)。
   無ければプロシージャル生成に落ちる。
+- 文言を変えたら `npm run fonts` でサブセットフォントを作り直す (無い字はしっぽり明朝で出る)。
 - 見出しの毛筆フォント「Sumi」は商用フォント (昭和書体 KSW清龍N) のためリポジトリに含めていない。
   無ければ `@fontsource/shippori-mincho` にフォールバックする。
 
-## paper モードの仕組み (Phase 2〜3)
+## paper モードの仕組み (Phase 2〜4)
 
 二つの格子を使う。
 
@@ -59,6 +61,10 @@ tools/regress/       fluid の回帰確認ハーネス
 流れ込んで顔料を運び、そこで定着する。流れる途中で顔料の一部は繊維に濾し取られ (`filterRate`)、暈は外へ向かって薄れる。
 筆が置いた余分な水は表面の溜まりとして残り、放した後も数秒かけて暈に供給される。
 `node tools/regress/paper.mjs --raw` で半径方向のプロファイルを見られる。
+
+表示 (`paper/shaders/display-paper.frag`): 色の定数 (濃墨・薄墨・湿り墨・和紙・落款・光の向き) は `shaders/common/inkColor.glsl` を
+fluid と共有する。濃度は F + P (P は紙の局所的な凹凸で沈殿ムラ)、湿り艶は水の膜の厚みから法線を作って fluid と同じ光を当てる。
+文字と落款は共通の文字レイヤーで、湿った墨が乗ると縁がにじむ。
 
 筆 (`paper/brush.ts`): 筆圧で半径、傾きで楕円。墨残量はストローク開始時 1 で、筆圧で重み付けした累積長ととどまった時間で減る。
 接地判定は紙の高さで、しきい値は墨残量が減るほど・筆圧が低いほど上がる (`kasureMin` → `kasureMax`) ので、

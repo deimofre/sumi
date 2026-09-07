@@ -37,7 +37,7 @@ try {
   }
   const last = res.checkpoints[res.checkpoints.length - 1];
   console.log('final F profile (r → F):', last.fixed.slice(0, 30).map((v, i) => `${(i + 0.5) * bin}:${v.toFixed(2)}`).join(' '));
-  savePng(res.pngNormal, outDir, 'paper-normal.png'); savePng(res.pngFixed, outDir, 'paper-fixed.png');
+  savePng(res.pngNormal, outDir, 'paper-normal.png'); savePng(res.pngFixed, outDir, 'paper-fixed.png'); savePng(res.pngWet, outDir, 'paper-wet.png');
   ok = res.glError === 0;
 } finally {
   head.child.kill();   // process.exit は finally の後で (try の中で exit すると vite が残る)
