@@ -2,13 +2,17 @@
 // paper モードのパラメータ。Phase 5 でデバッグパネルから触れるようにする。
 // 各値のコメントは「何を変えると何が変わるか」
 // ============================================================
+export const VIEWS = ['paper', 'height', 'water', 'pigment', 'fixed'] as const;
+export type View = (typeof VIEWS)[number];
+export const isView = (v: unknown): v is View => (VIEWS as readonly unknown[]).includes(v);
+
 export const PAPER = {
   /** シミュレーションと紙の解像度 (短辺ピクセル)。0 なら自動: 描画バッファの短辺が 1536px 以上なら 2048、未満なら 1024 */
   resShort: 0,
   /** 紙画像の URL (RGB = 和紙の色、A = 高さ)。null ならプロシージャル生成 */
   paperImage: null as string | null,
-  /** 表示: 'paper' は通常、'height' は紙の高さ (掠れ判定に使う凹凸) を白黒で見る */
-  view: 'paper' as 'paper' | 'height',
+  /** 表示: paper = 通常、height = 紙の高さ、water / pigment / fixed = 状態の各層を白黒で見る */
+  view: 'paper' as View,
 
   // ---- プロシージャル紙 (paperImage が無いとき) ----
   /** 細かい目の周期の倍率。1 で fluid モードと同じ。大きいほど粗い目 */
@@ -19,4 +23,52 @@ export const PAPER = {
   laidStrength: 0.6,
   /** 高さのコントラスト。大きいほど高低差が広がる (1 で素の分布) */
   heightContrast: 1.8,
+
+  // ---- 格子 ----
+  /** 水と移動顔料が流れる粗い格子の解像度 (短辺)。端末によらず同じにして、にじみの広がりを揃える。大きいほど縁が細かく、負荷は二乗で増える */
+  flowRes: 384,
+
+  // ---- 拡散 (毛細管、粗い格子) ----
+  /** 拡散係数 k: 1 ステップで隣へ流れる割合 (0..1 未満)。大きいほど速く広がる */
+  diffusion: 0.7,
+  /** 1 フレームの拡散ステップ数。増やすと広がりが速く滑らかになるが、GPU 負荷が比例して増える */
+  flowSteps: 6,
+  /** 繊維方向の効き 0..1。0 で等方、1 で繊維に直交する向きには (揃った所では) 流れない */
+  anisotropy: 0.5,
+  /** ピン止めしきい値: W がこれ以下の点からは流出しない。小さいほど遠くまでにじむ */
+  pinThreshold: 0.02,
+  /** 保水容量の基準。紙の高い所 (繊維) ほど多く持てる (0.6〜1.4 倍) */
+  capacity: 1.0,
+  /** 顔料の微小な等方拡散。大きいほど縁がぼける */
+  pigmentDiffusion: 0.02,
+
+  // ---- 蒸発・定着 ----
+  /** 蒸発速度: 1 秒に減る W。W = 1 の水が乾くまで約 1 / evapRate 秒 */
+  evapRate: 0.15,
+  /** 薄い水ほど速く乾く度合い (縁から乾く)。0 で一様、1 で薄い所は 2 倍速 */
+  evapThinBoost: 1.5,
+  /** 定着速度: 乾いた所で 1 秒に定着する移動顔料の割合。濡れている所は遅い */
+  fixRate: 0.6,
+  /** 定着するとき紙の高い所 (繊維) に多く沈む度合い 0..1 (沈殿ムラ)。0 で一様 */
+  settleStrength: 0.6,
+  /** 湿り年齢 (艶) の半減期 (秒) */
+  wetAgeHalfLife: 1.5,
+
+  // ---- 筆 (Phase 2 の仮。楕円化・毛の割れ・墨残量は Phase 3) ----
+  /** 基準半径 (短辺 = 1)。筆圧 1 のとき */
+  brushRadius: 0.015,
+  /** 接地しきい値と柔らかさ: 紙の高さがしきい値未満の所には墨が付かない (掠れ)。Phase 2 はほぼ全面接地 */
+  contactThreshold: 0.0, contactSoftness: 0.15,
+  /** 筆が置いた顔料のうち、接地した繊維にその場で定着する割合。残りは水に乗ってにじむ。大きいほど線が濃くにじみが薄い */
+  brushFixFraction: 0.5,
+  /** なぞり 1 サンプル (短辺の 0.5%) あたりの水と顔料の供給量 */
+  brushWater: 0.5, brushPigment: 0.2,
+  /** とどまりの供給量 (毎秒) */
+  holdWater: 6.0, holdPigment: 3.0,
+
+  // ---- 表示 ----
+  /** 濃度 (F + P) → 不透明度の係数。大きいほど薄い墨も黒く見える */
+  inkOpacity: 3.0,
+  /** water / pigment / fixed 表示の倍率。値 × 倍率を平方根で符号化して描く (検証用。1 を超える値を見るときに下げる) */
+  viewScale: 1.0,
 };

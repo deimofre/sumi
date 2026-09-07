@@ -5,7 +5,7 @@ import './style.css';
 
 import { createApp } from './app/app.ts';
 import { isModeName, type ModeName } from './app/mode.ts';
-import { PAPER } from './paper/params.ts';
+import { isView, PAPER, VIEWS } from './paper/params.ts';
 
 function main(): void {
   const canvas = document.getElementById('gl') as HTMLCanvasElement;
@@ -13,10 +13,11 @@ function main(): void {
   const fail = (msg?: string) => { fallbackEl.style.display = 'grid'; if (msg) fallbackEl.textContent = msg; };
   window.addEventListener('error', e => fail('エラー: ' + (e.message || e.error)));
 
-  // ---- 1. URL パラメータ: ?mode=paper でモード、?view=height で紙の高さ表示 (paper モードの確認用) ----
+  // ---- 1. URL パラメータ: ?mode=paper でモード、?view=height|water|pigment|fixed で paper の各層を見る ----
   const url = new URL(location.href);
   const modeParam = url.searchParams.get('mode');
-  if (url.searchParams.get('view') === 'height') PAPER.view = 'height';
+  const viewParam = url.searchParams.get('view');
+  if (isView(viewParam)) PAPER.view = viewParam;
 
   // ---- 2. App (WebGL2、入力層、モード) ----
   const app = createApp(canvas, isModeName(modeParam) ? modeParam : 'fluid');
@@ -42,6 +43,7 @@ function main(): void {
       case 'c': app.clear(); break;
       case 'm': setMode(app.mode.name === 'fluid' ? 'paper' : 'fluid'); break;
       case 'h': PAPER.view = PAPER.view === 'height' ? 'paper' : 'height'; break;
+      case 'v': PAPER.view = VIEWS[(VIEWS.indexOf(PAPER.view) + 1) % VIEWS.length]!; break;
     }
   });
   syncUi();

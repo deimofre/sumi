@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "fonts": "node tools/subset-font.mjs",
-    "regress": "node tools/regress/run.mjs"
+    "regress": "node tools/regress/run.mjs",
+    "regress:paper": "node tools/regress/paper.mjs"
   },
   "devDependencies": {
     "subset-font": "^2.7.0",

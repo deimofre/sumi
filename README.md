@@ -12,7 +12,7 @@ npm run regress   # fluid モードの回帰確認 (macOS の Chrome が要る�
 
 - **水面 (fluid)**: 水面に墨を流す。分割前からの実装で、見た目と挙動は変えていない。
 - **紙 (paper)**: 紙に筆で書く (毛細管にじみモデル)。`paper-ink-mode-spec.md` の指示書に沿って段階的に作っている。
-  いまは Phase 1 (紙の生成と表示だけ)。
+  いまは Phase 2 (水・移動顔料・固定顔料の 3 層コア)。筆は仮のもので、掠れ・墨残量は Phase 3。
 
 切替は画面右下の「水面 / 紙」、キーボードの `m`、または URL の `?mode=paper`。切替時にシミュレーションの状態は捨て、バッファは解放する。
 
@@ -21,6 +21,7 @@ npm run regress   # fluid モードの回帰確認 (macOS の Chrome が要る�
 | `c` / 「紙を替える」 | 水面: 墨を薄める。紙: 目の違う紙を生成し直す |
 | `m` | モード切替 |
 | `h` / `?view=height` | 紙モードで、紙の高さ (掠れ判定に使う凹凸) を白黒で見る |
+| `v` / `?view=water` など | 紙モードで表示を切り替える: paper → height → water → pigment → fixed |
 | `?mode=paper` | 紙モードで開く |
 
 ## 構成
@@ -31,7 +32,8 @@ src/
   app/               App (GL 環境 + 入力層 + 現在のモード) と Mode インターフェース
   input/stroke.ts    入力層 (両モード共通): ポインタ → ストロークサンプル列。入り・抜き・とどまりの判定
   sim/               fluid モード。brush.ts がサンプルを水面への注入に変換し、fluid.ts が 1 ステップ進める
-  paper/             paper モード。params.ts にパラメータ、paperTexture.ts が紙 (画像 or プロシージャル)
+  paper/             paper モード。params.ts にパラメータ、paperTexture.ts が紙 (画像 or プロシージャル)、
+                     brush.ts が筆、index.ts が毎フレームのパス
   shaders/           fluid のシェーダー。common/ は両モード共有 (#include で読む)
   paper/shaders/     paper のシェーダー
   config.ts          fluid の数値 (解像度、半減期など)
@@ -43,6 +45,23 @@ tools/regress/       fluid の回帰確認ハーネス
   無ければプロシージャル生成に落ちる。
 - 見出しの毛筆フォント「Sumi」は商用フォント (昭和書体 KSW清龍N) のためリポジトリに含めていない。
   無ければ `@fontsource/shippori-mincho` にフォールバックする。
+
+## paper モードの仕組み (Phase 2)
+
+二つの格子を使う。
+
+- **流れの格子 (粗い、短辺 `flowRes` = 384)**: 水 W、移動顔料 P、湿り年齢。毛細管拡散・顔料の移流・蒸発・定着を
+  1 パスで計算する (`paper/shaders/update.frag`)。端末の解像度によらず同じ格子なので、にじみの広がりが揃う。
+- **定着の格子 (細かい、短辺 1024 / 2048)**: 固定顔料 F。筆が置いた顔料の一部はその場で繊維に定着し (掠れの筋)、
+  流れの格子で定着した分は紙の目に沿って写される (`settle.frag`)。
+
+縁が濃くなる (コーヒーリング) のはノイズではなく物理から出る: 縁の薄い水が先に乾いてピン止めされ、内側から水が
+流れ込んで顔料を運び、そこで定着する。`node tools/regress/paper.mjs --raw` で半径方向のプロファイルを見られる。
+
+```sh
+npm run regress:paper                          # 一点に 1.5 秒とどまる → にじみの広がりと縁の濃さの表
+node tools/regress/paper.mjs --set diffusion=0.9 --set evapRate=0.1 --out shots   # パラメータを変えて試す
+```
 
 ## fluid モードの回帰確認
 

@@ -47,7 +47,8 @@ export interface StrokeInput {
 }
 
 // サンプリング密度: なぞりは短辺の 0.5% 間隔 (1 イベントあたり最大 40 点)、抜きの尾は 0.4% 間隔
-const MOVE_SPACING = 0.005, MOVE_MAX_SAMPLES = 40, TAIL_SPACING = 0.004;
+export const MOVE_SPACING = 0.005;
+const MOVE_MAX_SAMPLES = 40, TAIL_SPACING = 0.004;
 // 入り: 累積長がこの距離 (短辺の 4%) に達するまでに筆の腹が乗る
 const ENTRY_LEN = 0.04;
 // 抜き: 離す瞬間の速さがこれを超えると尾を引く。尾の長さは速さに比例し (上限あり)、約 0.1 秒で消える
