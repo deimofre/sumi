@@ -3,15 +3,9 @@ import '@fontsource/shippori-mincho/600.css';
 import './fonts.css';
 import './style.css';
 
-import { getContext } from './gl/context.ts';
-import { createQuad } from './gl/fbo.ts';
-import { createPrograms } from './shaders/index.ts';
-import { createBuffers } from './sim/buffers.ts';
-import { applyInputs, installPointerEvents } from './sim/brush.ts';
-import { render } from './sim/display.ts';
-import { step } from './sim/fluid.ts';
-import type { SimState } from './sim/state.ts';
-import { createTextTexture, drawText, watchFonts } from './sim/textLayer.ts';
+import { createApp } from './app/app.ts';
+import { isModeName, type ModeName } from './app/mode.ts';
+import { PAPER } from './paper/params.ts';
 
 function main(): void {
   const canvas = document.getElementById('gl') as HTMLCanvasElement;
@@ -19,50 +13,45 @@ function main(): void {
   const fail = (msg?: string) => { fallbackEl.style.display = 'grid'; if (msg) fallbackEl.textContent = msg; };
   window.addEventListener('error', e => fail('エラー: ' + (e.message || e.error)));
 
-  // ---- 1. WebGL2 セットアップ ----
-  const ctx = getContext(canvas);
-  if (!ctx) { fail(); return; }
-  const { gl, formats } = ctx;
-  const P = createPrograms(gl);
-  const blit = createQuad(gl);
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  // ---- 1. URL パラメータ: ?mode=paper でモード、?view=height で紙の高さ表示 (paper モードの確認用) ----
+  const url = new URL(location.href);
+  const modeParam = url.searchParams.get('mode');
+  if (url.searchParams.get('view') === 'height') PAPER.view = 'height';
 
-  // ---- 2. 解像度・バッファ・文字レイヤー ----
-  const measure = () => ({ w: Math.floor(canvas.clientWidth * dpr), h: Math.floor(canvas.clientHeight * dpr) });
-  const first = measure();
-  canvas.width = first.w; canvas.height = first.h;
-  const s: SimState = {
-    gl, canvas, formats, P, blit, dpr,
-    W: first.w, H: first.h, aspect: first.w / first.h,
-    ...createBuffers(gl, formats),
-    textTex: createTextTexture(gl),
-    fade: 0,
-  };
-  drawText(s);
-  watchFonts(s);
+  // ---- 2. App (WebGL2、入力層、モード) ----
+  const app = createApp(canvas, isModeName(modeParam) ? modeParam : 'fluid');
+  if (!app) { fail(); return; }
 
-  function resize(): boolean {
-    const { w, h } = measure();
-    if (w === s.W && h === s.H) return false;
-    s.W = canvas.width = w; s.H = canvas.height = h; s.aspect = s.W / s.H;
-    Object.assign(s, createBuffers(gl, formats)); drawText(s);
-    return true;
+  // ---- 3. UI: モード切替・紙を替える ----
+  const modeButtons = [...document.querySelectorAll<HTMLButtonElement>('button[data-mode]')];
+  const modeTexts = [...document.querySelectorAll<HTMLElement>('p[data-mode]')];
+  function syncUi(): void {
+    const name = app!.mode.name;
+    for (const b of modeButtons) b.setAttribute('aria-pressed', String(b.dataset.mode === name));
+    for (const p of modeTexts) p.hidden = p.dataset.mode !== name;
+    // 再読み込みしても同じモードで開くよう URL に残す (fluid は既定なので付けない)
+    if (name === 'fluid') url.searchParams.delete('mode'); else url.searchParams.set('mode', name);
+    history.replaceState(null, '', url);
   }
-
-  // ---- 3. 入力 ----
-  installPointerEvents(s);
-  document.getElementById('clear')!.addEventListener('click', () => { s.fade = 0.9; });
-  window.addEventListener('keydown', e => { if (e.key === 'c' || e.key === 'C') s.fade = 0.9; });
+  function setMode(name: ModeName): void { app!.setMode(name); syncUi(); }
+  for (const b of modeButtons) b.addEventListener('click', () => { if (isModeName(b.dataset.mode)) setMode(b.dataset.mode); });
+  document.getElementById('clear')!.addEventListener('click', () => app.clear());
+  window.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    switch (e.key.toLowerCase()) {
+      case 'c': app.clear(); break;
+      case 'm': setMode(app.mode.name === 'fluid' ? 'paper' : 'fluid'); break;
+      case 'h': PAPER.view = PAPER.view === 'height' ? 'paper' : 'height'; break;
+    }
+  });
+  syncUi();
 
   // ---- 4. ループ ----
   let last = performance.now(), time = 0;
   function frame(now: number): void {
     const dt = Math.min((now - last) / 1000, 1 / 30) || 1 / 60;
     last = now; time += dt;
-    resize();
-    applyInputs(s, dt);
-    step(s, dt);
-    render(s, time);
+    app!.frame(dt, time);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

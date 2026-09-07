@@ -25,6 +25,11 @@ html, body { margin: 0; height: 100%; background: #e6e0d1; overflow: hidden; }
 }
 .ui button:hover, .ui button:focus-visible { opacity: 1; outline: none; }
 .ui button:focus-visible { box-shadow: 0 2px 0 0 currentColor; }
+.actions { display: flex; align-items: flex-end; gap: 22px; }
+/* モード切替: 選ばれている方だけ下線と濃い文字 */
+.modes { display: flex; gap: 14px; }
+.modes button { border-bottom-color: transparent; opacity: .45; }
+.modes button[aria-pressed="true"] { border-bottom-color: currentColor; opacity: 1; cursor: default; }
 #fallback {
   position: fixed; inset: 0; display: none; place-items: center; padding: 32px;
   font: 15px/1.8 "Sumi", "Shippori Mincho", serif; color: #3d3934; text-align: center;

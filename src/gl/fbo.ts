@@ -5,11 +5,15 @@ export interface FBO {
   width: number; height: number; texelX: number; texelY: number;
   /** テクスチャユニットにバインドしてそのユニット番号を返す */
   attach(unit: number): number;
+  /** GPU リソースを解放する。以後このオブジェクトは使えない */
+  destroy(): void;
 }
 export interface DoubleFBO {
   width: number; height: number; texelX: number; texelY: number;
   readonly read: FBO; readonly write: FBO;
   swap(): void;
+  /** 2 枚とも解放する */
+  destroy(): void;
 }
 
 export function createFBO(gl: WebGL2RenderingContext, w: number, h: number, fmt: TexFormat): FBO {
@@ -26,13 +30,22 @@ export function createFBO(gl: WebGL2RenderingContext, w: number, h: number, fmt:
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
   gl.viewport(0, 0, w, h); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
   return { texture, fbo, width: w, height: h, texelX: 1 / w, texelY: 1 / h,
-    attach(unit) { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, texture); return unit; } };
+    attach(unit) { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, texture); return unit; },
+    destroy() { gl.deleteFramebuffer(fbo); gl.deleteTexture(texture); } };
 }
 
 export function createDoubleFBO(gl: WebGL2RenderingContext, w: number, h: number, fmt: TexFormat): DoubleFBO {
   let a = createFBO(gl, w, h, fmt), b = createFBO(gl, w, h, fmt);
   return { width: w, height: h, texelX: 1 / w, texelY: 1 / h,
-    get read() { return a; }, get write() { return b; }, swap() { const t = a; a = b; b = t; } };
+    get read() { return a; }, get write() { return b; }, swap() { const t = a; a = b; b = t; },
+    destroy() { a.destroy(); b.destroy(); } };
+}
+
+/** 短辺を base ピクセルにし、長辺を描画バッファの縦横比に合わせた解像度を返す (両モードのバッファ共通) */
+export function fitResolution(gl: WebGL2RenderingContext, base: number): { w: number; h: number } {
+  let a = gl.drawingBufferWidth / gl.drawingBufferHeight; if (a < 1) a = 1 / a;
+  const min = Math.round(base), max = Math.round(base * a);
+  return gl.drawingBufferWidth > gl.drawingBufferHeight ? { w: max, h: min } : { w: min, h: max };
 }
 
 /** 画面いっぱいの四角形 (VAO) を作り、それを描く blit 関数を返す。target が null なら画面へ */

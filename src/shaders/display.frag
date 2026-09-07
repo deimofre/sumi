@@ -1,6 +1,7 @@
 #version 300 es
 #include common/head.glsl
 #include common/noise.glsl
+#include common/inkColor.glsl
 // ---- 表示パス: 紙・墨の質感・文字の歪み・落款 ----
 uniform sampler2D uDye, uVelocity, uText;
 uniform vec2 uPaperPx, uDyeTexel, uSimTexel;
@@ -12,7 +13,7 @@ void main() {
   vec2 vel = texture(uVelocity, vUv).xy;
 
   // --- 和紙 ---
-  vec3 paper = vec3(0.925, 0.905, 0.855);
+  vec3 paper = PAPER_BASE;
   float fiber  = fbm(px * 0.045);                 // 大きなムラ
   float grain  = vnoise(px * 0.6);                // 細かい目
   float laid   = vnoise(vec2(px.x * 0.02, px.y * 0.35)); // 簀の目 (横筋)
@@ -35,9 +36,7 @@ void main() {
   float halo = smoothstep(0.0, 0.06, d) * (0.45 + 0.55 * vnoise(px * 0.9)); // 薄い水の輪
   float inkA = clamp(body + rim + 0.22 * halo, 0.0, 1.0);
 
-  vec3 inkDense = vec3(0.075, 0.070, 0.068);
-  vec3 inkThin  = vec3(0.34, 0.37, 0.385);     // 薄墨は青みが出る
-  vec3 inkWet   = vec3(0.035, 0.040, 0.055);   // 生乾きは深く艶がある
+  vec3 inkDense = INK_DENSE, inkThin = INK_THIN, inkWet = INK_WET;   // 色は common/inkColor.glsl
   vec3 inkCol = mix(inkThin, inkDense, body);
   inkCol = mix(inkCol, inkWet, wet * body * 0.85);
 
@@ -49,7 +48,7 @@ void main() {
   N.xy += ripple * (vnoise(px * 0.25 + vel * 0.02) - 0.5) * 2.0 * vec2(-vel.y, vel.x) / max(speed, 0.001);
   N = normalize(N);
 
-  vec3 L = normalize(vec3(-0.45, 0.75, 0.55));                    // 左上からの光
+  vec3 L = LIGHT_DIR;                                             // 左上からの光
   vec3 V = vec3(0.0, 0.0, 1.0);                                   // 視線は真上
   vec3 Hv = normalize(L + V);
   float gloss = mix(0.12, 1.0, wet);                              // 乾くとマット
@@ -88,7 +87,7 @@ void main() {
   vec3 col = paper;
   col = mix(col, inkDense * (1.0 + 0.18 * gran), txt * (0.9 + 0.1 * grain));
   float sealA = seal * (0.5 + 0.5 * smoothstep(0.3, 0.7, vnoise(px * 0.7)));   // 印影のかすれ
-  col = mix(col, vec3(0.72, 0.20, 0.16), sealA * 0.92);
+  col = mix(col, SEAL_RED, sealA * 0.92);
   col = mix(col, inkCol, inkA);
   col += sheen;
   col += (hash(px) - 0.5) / 255.0;   // ディザ
